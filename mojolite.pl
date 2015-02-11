@@ -4,6 +4,7 @@ use Mojolicious::Lite;
 use Mango;
 use Mango::BSON ':bson';
 
+## MongoDB remote path
 my $uri = 'mongodb://username:password@ds031541.mongolab.com:31541/mydb';
 
 helper mango => sub { state $mango = Mango->new($uri) };
@@ -91,7 +92,6 @@ get '/' => sub {
 
 app->start;
 
-
 __DATA__
 
 @@ add_entry.html.ep
@@ -139,6 +139,7 @@ __DATA__
 </form>
 </fieldset>
 </div>
+
 
 
 @@ meteor_framework.html.ep
@@ -199,10 +200,6 @@ If you prefer to skip installtion process you can use cloud base provider (like 
 
 
 
-
-
-
-
 @@ home.html.ep
 % title 'Welcome to my page';
 % layout 'default';
@@ -224,11 +221,7 @@ If you prefer to skip installtion process you can use cloud base provider (like 
         </li>
       % }
     </ul>
-
 </div>
-
-
-
 
 
 
@@ -244,9 +237,7 @@ If you prefer to skip installtion process you can use cloud base provider (like 
   <link href="icons/foundation-icons.css" rel="stylesheet" />
   <script src="js/vendor/modernizr.js"></script>
 </head>
-
 <body>
-
 <div data-magellan-expedition="fixed">
 <nav class="top-bar" data-topbar role="navigation">
   <ul class="title-area">
@@ -258,19 +249,16 @@ If you prefer to skip installtion process you can use cloud base provider (like 
   </ul>
 
   <section class="top-bar-section">
-  
-    <!-- Left Nav Section -->
+      <!-- Left Nav Section -->
     <ul class="left">
       <li class="<%= $selection->{home} %>"><a href="/">Home</a></li>
       <li class="<%= $selection->{info} %>"><a href="/info">Info</a></li>
     </ul>
-
   </section>
 </nav>
 </div>
   <br />
   <%= content %>
-
   <script src="js/vendor/jquery.js"></script>
   <script src="js/foundation.min.js"></script>
   <script src="js/foundation/foundation.equalizer.js"></script>
