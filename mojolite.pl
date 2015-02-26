@@ -9,83 +9,77 @@ my $uri = 'mongodb://username:password@ds031541.mongolab.com:31541/mydb';
 
 helper mango => sub { state $mango = Mango->new($uri) };
 
-my $menu_items;
-$menu_items->{home}=q{};
-$menu_items->{info}=q{};
+{
+  package NavMenu;
 
-post '/add_new_post' => sub {
-  my $self = shift;
+  sub new { 
+    my $class = shift;
+    my $self->{nav} = { @_ };
+    bless $self, $class;
+  } 
 
-  my $form_entry = {
-          title => $self->param('post_title'),
-           date => $self->param('post_date'),
-           desc => $self->param('post_desc'),
-          image => $self->param('post_image'),
-      available => $self->param('post_enable') ? 1 : 0,
-  };
- 
-  my $collection = $self->mango->db->collection('blog');
-  $collection->insert($form_entry);
+  sub setNavItem {
+    my $self = shift;
 
-  #$self->render( json => $form_entry );
-  $self->redirect_to('/');
-};
-
-get '/record_panel' => sub {
-  my $self = shift;
-
-  $self->render(template => 'record_panel', format => 'html', handler => 'ep');
-};
-
-any '/add_post' => sub {
-  my $self = shift;
-
-  foreach my $key ( keys %{$menu_items} ) {
-    $menu_items->{$key} = ($key eq 'info') ? 'active' : '';
+    foreach ( keys %{$self->{nav}} ) {
+      $self->{nav}->{$_} = 0;
+    }
+    $self->{nav}->{$_[0]} = 1;
   }
 
-  $self->stash(selection => $menu_items);
-  $self->render(template => 'add_entry', format => 'html', handler => 'ep');
-};
+  sub getNavMenuItems {
+    my $self = shift;
+    $self->{nav};
+  }
+1;
+}
+
+my $nav = NavMenu->new( home => 1, info => 0 );
+
 
 get '/info' => sub {
   my $self = shift;
 
-  foreach my $key ( keys %{$menu_items} ) {
-    $menu_items->{$key} = ($key eq 'info') ? 'active' : '';
-  }
+  $nav->setNavItem('info');
 
-  $self->stash(selection => $menu_items);
+  $self->stash(selection => $nav->getNavMenuItems );
   $self->render(template => 'about', format => 'html', handler => 'ep');
 };
 
 get '/meteor_framework' => sub {
   my $self = shift;
 
-  $self->stash(selection => $menu_items);
+  $self->stash(selection => $nav->getNavMenuItems );
   $self->render(template => 'meteor_framework', format => 'html', handler => 'ep');
+};
+
+get '/perl_script' => sub {
+  my $self = shift;
+
+  $self->stash(selection => $nav->getNavMenuItems );
+  $self->render(template => 'perl_script_email', format => 'html', handler => 'ep');
 };
 
 get '/mongodb' => sub {
   my $self = shift;
 
-  $self->stash(selection => $menu_items);
+  $self->stash(selection => $nav->getNavMenuItems );
   $self->render(template => 'mongodb_tut1', format => 'html', handler => 'ep');
 };
 
 get '/' => sub {
   my $self = shift;
 
-  foreach my $key ( keys %{$menu_items} ) {
-    $menu_items->{$key} = ($key eq 'home') ? 'active' : '';
-  }
+  $nav->setNavItem('home');
+  # $self->app->log->debug(Dumper $nav, $nav->getNavMenuItems); 
 
   my $collection = $self->mango->db->collection('blog');
   $collection->find->sort({_id => -1})->fields({_id => 0})->all(sub {
     my ($collection, $err, $docs) = @_;
 
     return $self->reply->exception($err) if $err;
-    $self->stash(selection => $menu_items );
+
+    $self->stash(selection => $nav->getNavMenuItems );
     $self->render('home', post => $docs);
   });
 };
@@ -155,7 +149,50 @@ __DATA__
   <p>Simple todo meteor <a href="http://vogen_todolist.meteor.com">app</a></p>
 </div>
 
+@@ perl_script_email.html.ep
+% title 'Perl Script';
+% layout 'default';
 
+<div class="row panel callout radius">
+  <div class="small-12 columns">
+  <h4>Alert when disk space is running out.</h4>
+  <p>I wanted to know when my raspberry pi diskspace is running out, so I wrote a simple script and run through cron.</p>
+<pre> <code class="perl">
+#!/usr/bin/env perl
+use strict;
+use warnings;
+my $disk_space_use = qx(df -h | grep rootfs);
+my @columns = (split /\s+/, $disk_space_use);
+
+my $hash_ref = {
+  Filesystem => $columns[0],
+  Size       => $columns[1],
+  Used       => $columns[2],
+  Available  => $columns[3],
+  Used_Per   => $columns[4],
+  Path       => $columns[5],
+};
+
+my $path = '/tmp/used_diskspace';
+my ($size) = ( $hash_ref->{Used_Per} =~ /^(\d{1,})+/ );
+qx( echo "Diskspace used:" $hash_ref->{Used_Per} > $path );
+
+## Send email notification if disk usage is more than 95%
+if ( $size > 95 ) {
+    qx( mail -s "Diskspace alert:" root\@localhost < $path );
+}
+else {
+    print "Currently using $hash_ref->{Used_Per} ($hash_ref->{Used} of $hash_ref->{Size}) of disk space.\n";
+}
+</code>
+</pre>
+<br />
+<p>Code below to run script every 5 hours</p>
+<pre><code class="bash">
+0 */5 * * * /home/pi/scripts/diskspace_alert.pl > /var/log/scripts/diskspace_alert.log 2>&1
+</code>
+</pre>
+</div>
 
 @@ mongodb_tut1.html.ep
 % layout 'default';
@@ -195,9 +232,13 @@ If you prefer to skip installtion process you can use cloud base provider (like 
     <div class="small-12 columns">
       <p>Welcome to my page. My name is vogen, I am a Software Developer. I created this website using mojolicious(real time perl framework written in perl), Foundation (Front-end Framework) responsive layout. The backend database is MongoDB (hosted on Amazon WebServices). I love technology and passionate about. I also love coding and learn new things in everyday of my life.</p>
       <p>I will be posting my everyday work and things I would like to share with those who are interested.</p>
+<p>
+<a href="http://au.linkedin.com/in/vogen">
+          <img src="https://static.licdn.com/scds/common/u/img/webpromo/btn_profile_bluetxt_80x15.png" width="80" height="15" border="0" alt="View vogen gurung's profile on LinkedIn">
+    </a>
+</p>
     </div>
 </div>
-
 
 
 @@ home.html.ep
@@ -205,7 +246,7 @@ If you prefer to skip installtion process you can use cloud base provider (like 
 % layout 'default';
 <div class="row panel callout radius">
 
-    <ul class="small-block-grid-1 medium-block-grid-3 large-block-grid-5">
+    <ul class="small-block-grid-1 medium-block-grid-3 large-block-grid- 4">
       % foreach my $item (@$post) {
         % my $image = $item->{image};
         % $image =~ s/www\.dropbox\.com/dl\.dropboxusercontent\.com/g;
@@ -236,6 +277,8 @@ If you prefer to skip installtion process you can use cloud base provider (like 
   <link rel="stylesheet" href="css/normalize.css" />
   <link href="icons/foundation-icons.css" rel="stylesheet" />
   <script src="js/vendor/modernizr.js"></script>
+  <link rel="stylesheet" title="Default" href="highlight/styles/monokai_sublime.css">
+  <script src="highlight/highlight.pack.js"></script>`
 </head>
 <body>
 <div data-magellan-expedition="fixed">
@@ -251,8 +294,8 @@ If you prefer to skip installtion process you can use cloud base provider (like 
   <section class="top-bar-section">
       <!-- Left Nav Section -->
     <ul class="left">
-      <li class="<%= $selection->{home} %>"><a href="/">Home</a></li>
-      <li class="<%= $selection->{info} %>"><a href="/info">Info</a></li>
+      <li class="<%= ($selection->{home}) ? 'active' : '' %>"><a href="/">Home</a></li>
+      <li class="<%= ($selection->{info}) ? 'active' : '' %>"><a href="/info">Info</a></li>
     </ul>
   </section>
 </nav>
@@ -265,5 +308,6 @@ If you prefer to skip installtion process you can use cloud base provider (like 
   <script>
     $(document).foundation();
   </script>
+  <script>hljs.initHighlightingOnLoad();</script>
 </body>
 </html>
